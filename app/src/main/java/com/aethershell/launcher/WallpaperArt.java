@@ -23,7 +23,8 @@ public final class WallpaperArt {
     public static void render(Canvas canvas, int width, int height, int style, boolean amoled) {
         if (width <= 0 || height <= 0) return;
         final int idx = Math.floorMod(style, NAMES.length);
-        int[] c = COLORS[idx];
+        // AMOLED must not mutate the shared colors used by normal previews.
+        int[] c = COLORS[idx].clone();
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
         float w = width, h = height;
         if (amoled) c[0] = Color.BLACK;

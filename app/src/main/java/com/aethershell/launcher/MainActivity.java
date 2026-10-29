@@ -40,6 +40,7 @@ public final class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle b){super.onCreate(b);getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);
         prefs=getSharedPreferences(PREF,MODE_PRIVATE);readSettings();showPage(0);loadApps();}
+    @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);showPage(0);}
     @Override protected void onResume(){super.onResume();handler.removeCallbacks(tick);tick.run();}
     @Override protected void onPause(){handler.removeCallbacks(tick);super.onPause();}
     @Override protected void onDestroy(){destroyed=true;handler.removeCallbacks(tick);iconCache.evictAll();super.onDestroy();}
@@ -160,7 +161,9 @@ public final class MainActivity extends Activity {
         body.addView(hero,lp(-1,330));gap(body,12);
         LinearLayout buttons=horizontal();buttons.addView(primary("Apply wallpaper",this::applyDialog),new LinearLayout.LayoutParams(0,dp(50),1));buttons.addView(new View(this),lp(8,1));
         buttons.addView(pill("Save PNG",this::exportWallpaper),new LinearLayout.LayoutParams(0,dp(50),1));body.addView(buttons);gap(body,9);
-        body.addView(pill("＋  Use a photo from your phone",this::choosePhoto),lp(-1,48));gap(body,22);
+        body.addView(pill("＋  Use a photo from your phone",this::choosePhoto),lp(-1,48));gap(body,9);
+        if(photoUri!=null){body.addView(pill("✕  Return to original artwork",()->{clearPhoto();save();showPage(1);}),lp(-1,46));gap(body,9);}
+        gap(body,13);
         body.addView(text("ORIGINAL COLLECTION",11,MUTED,true));gap(body,10);
         GridLayout grid=new GridLayout(this);grid.setColumnCount(3);body.addView(grid);
         for(int i=0;i<WallpaperArt.NAMES.length;i++){final int choice=i;
@@ -169,7 +172,7 @@ public final class MainActivity extends Activity {
             WallpaperArt.Preview image=new WallpaperArt.Preview(this,i,amoled);thumb.addView(image,new FrameLayout.LayoutParams(-1,-1));
             tile.addView(thumb,lp(-1,141));TextView name=text(WallpaperArt.NAMES[i],11,choice==wallpaper&&photoUri==null?accent():WHITE,true);name.setGravity(Gravity.CENTER);tile.addView(name,lp(-1,24));
             GridLayout.LayoutParams p=new GridLayout.LayoutParams();p.width=0;p.height=dp(183);p.columnSpec=GridLayout.spec(GridLayout.UNDEFINED,1f);grid.addView(tile,p);
-            tile.setOnClickListener(v->{photoUri=null;wallpaper=choice;save();showPage(1);});
+            tile.setOnClickListener(v->{clearPhoto();wallpaper=choice;save();showPage(1);});
         }
     }
     private void buildStyle(LinearLayout body){body.addView(text("Personalize",27,WHITE,true));gap(body,5);
@@ -192,7 +195,7 @@ public final class MainActivity extends Activity {
         gap(body,14);section(body,"DATA & PRIVACY");
         settingRow(body,"Reset AetherShell preferences","Does not change system wallpaper",()->new AlertDialog.Builder(this).setTitle("Reset preferences?")
             .setMessage("Pins, colors and app appearance will return to defaults. System wallpaper will not change.")
-            .setNegativeButton("Cancel",null).setPositiveButton("Reset",(d,w)->{prefs.edit().clear().apply();photoUri=null;readSettings();showPage(2);}).show());
+            .setNegativeButton("Cancel",null).setPositiveButton("Reset",(d,w)->{clearPhoto();prefs.edit().clear().apply();readSettings();showPage(2);}).show());
         body.addView(text("No internet permission · no analytics · no background service · no accessibility service.",11,MUTED,false));
     }
     private void section(LinearLayout l,String title){TextView t=text(title,11,MUTED,true);t.setLetterSpacing(.12f);l.addView(t);gap(l,9);}
@@ -227,7 +230,8 @@ public final class MainActivity extends Activity {
             CharSequence label=res.loadLabel(pm);found.add(new AppEntry(p,cls,label==null?p:label.toString()));
         }}catch(Exception ignored){}found.sort((a,b)->a.label.compareToIgnoreCase(b.label));
         handler.post(()->{if(destroyed)return;apps.clear();apps.addAll(found);loaded=true;
-            if(favorites.isEmpty()){
+            // A deliberately empty favorites list must stay empty on the next launch.
+            if(!prefs.contains("favorites")){
                 for(String q:new String[]{"camera","phone","message","chrome"})for(AppEntry a:apps)if(a.pkg.toLowerCase(Locale.ROOT).contains(q)&&!favorites.contains(a.id())){favorites.add(a.id());break;}
                 save();
             }
@@ -281,9 +285,13 @@ public final class MainActivity extends Activity {
     }
     private void choosePhoto(){Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("image/*");i.addCategory(Intent.CATEGORY_OPENABLE);
         try{startActivityForResult(i,PICK_IMAGE);}catch(Exception e){toast("Image picker unavailable");}}
+    private void clearPhoto(){Uri old=photoUri;photoUri=null;if(old!=null){
+        try{getContentResolver().releasePersistableUriPermission(old,Intent.FLAG_GRANT_READ_URI_PERMISSION);}catch(Exception ignored){}
+    }}
     @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);
         if(request==PICK_IMAGE&&result==RESULT_OK&&data!=null&&data.getData()!=null){Uri u=data.getData();
             try{getContentResolver().takePersistableUriPermission(u,Intent.FLAG_GRANT_READ_URI_PERMISSION);}catch(Exception ignored){}
+            if(photoUri!=null&&!photoUri.equals(u))clearPhoto();
             photoUri=u;save();showPage(1);
         }}
     private void applyDialog(){new AlertDialog.Builder(this).setTitle("Apply wallpaper")
