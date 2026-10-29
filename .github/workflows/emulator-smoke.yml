@@ -1,0 +1,59 @@
+name: Android emulator smoke test
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/emulator-smoke.yml'
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Android SDK
+        run: |
+          SDK_MANAGER="$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f -print -quit)"
+          test -n "$SDK_MANAGER"
+          "$SDK_MANAGER" --install 'platforms;android-36' 'build-tools;36.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Build APK
+        run: gradle --no-daemon :app:assembleDebug
+      - name: Allow hardware acceleration
+        run: |
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+      - name: Boot emulator and verify launch
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: default
+          disable-animations: true
+          script: |
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            adb logcat -c
+            adb shell am start -W -n com.aethershell.launcher/.MainActivity
+            sleep 4
+            adb shell pidof com.aethershell.launcher
+            adb shell uiautomator dump /sdcard/window.xml
+            adb shell cat /sdcard/window.xml | grep -q AETHERSHELL
+            adb shell dumpsys meminfo com.aethershell.launcher | head -35
+            adb exec-out screencap -p > emulator-screenshot.png
+            if adb logcat -d -s AndroidRuntime:E | grep -q 'FATAL EXCEPTION'; then
+              echo 'AndroidRuntime reported a crash'
+              exit 1
+            fi
+      - name: Attach emulator screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AetherShell-emulator-screenshot
+          path: emulator-screenshot.png
+          if-no-files-found: ignore
