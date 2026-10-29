@@ -56,8 +56,8 @@ public final class MainActivity extends Activity {
     private GradientDrawable shape(int color,int rad){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(rad));return d;}
     private GradientDrawable border(int color,int radius,int stroke){GradientDrawable d=shape(color,radius);d.setStroke(dp(1),stroke);return d;}
     private TextView text(String s,int sp,int color,boolean bold){TextView t=new TextView(this);t.setText(s);t.setTextColor(color);t.setTextSize(sp);t.setFontFeatureSettings("kern");if(bold)t.setTypeface(android.graphics.Typeface.DEFAULT,Typeface.BOLD);t.setGravity(Gravity.CENTER_VERTICAL);return t;}
-    private LinearLayout vertical(){LinearLayout l=new LinearLayout(this);l.setOrientation(1);return l;}
-    private LinearLayout horizontal(){LinearLayout l=new LinearLayout(this);l.setOrientation(0);l.setGravity(Gravity.CENTER_VERTICAL);return l;}
+    private LinearLayout vertical(){LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.VERTICAL);return l;}
+    private LinearLayout horizontal(){LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.HORIZONTAL);l.setGravity(Gravity.CENTER_VERTICAL);return l;}
     private LinearLayout.LayoutParams lp(int w,int h){return new LinearLayout.LayoutParams(w<0?w:dp(w),h<0?h:dp(h));}
     private void pad(View v,int h,int vpad){v.setPadding(dp(h),dp(vpad),dp(h),dp(vpad));}
     private void gap(LinearLayout l,int h){l.addView(new View(this),lp(1,h));}
@@ -106,7 +106,41 @@ public final class MainActivity extends Activity {
         quick.addView(pill("Wallpaper",()->showPage(1)),new LinearLayout.LayoutParams(0,dp(45),1));quick.addView(new View(this),lp(8,1));
         quick.addView(pill("Settings",()->openSettings(Settings.ACTION_SETTINGS)),new LinearLayout.LayoutParams(0,dp(45),1));body.addView(quick);
     }
-    private ImageView imagePreview(){try{ImageView image=new ImageView(this);image.setScaleType(ImageView.ScaleType.CENTER_CROP);image.setImageURI(photoUri);return image;}catch(Exception ignored){return null;}}
+    private ImageView imagePreview(){
+        if(photoUri==null)return null;
+        ImageView image=new ImageView(this);
+        image.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        image.setBackgroundColor(0xff17202e);
+        final Uri imageUri=photoUri;
+        new Thread(()->{
+            Bitmap decoded=null;
+            try{
+                BitmapFactory.Options bounds=new BitmapFactory.Options();
+                bounds.inJustDecodeBounds=true;
+                try(InputStream stream=getContentResolver().openInputStream(imageUri)){
+                    BitmapFactory.decodeStream(stream,null,bounds);
+                }
+                if(bounds.outWidth>0 && bounds.outHeight>0){
+                    int sample=1;
+                    while(Math.max(bounds.outWidth/sample,bounds.outHeight/sample)>1400)sample*=2;
+                    BitmapFactory.Options options=new BitmapFactory.Options();
+                    options.inSampleSize=sample;
+                    try(InputStream stream=getContentResolver().openInputStream(imageUri)){
+                        decoded=BitmapFactory.decodeStream(stream,null,options);
+                    }
+                }
+            }catch(Exception ignored){}
+            final Bitmap result=decoded;
+            handler.post(()->{
+                if(destroyed || !imageUri.equals(photoUri) || image.getParent()==null){
+                    if(result!=null)result.recycle();
+                    return;
+                }
+                image.setImageBitmap(result);
+            });
+        },"AetherPhotoPreview").start();
+        return image;
+    }
     private void populatePinned(GridLayout pins){pins.removeAllViews();int max=Math.min(favorites.size(),columns*2);
         if(max==0){TextView empty=text("No pinned apps yet. Open All apps and long-press any icon to pin it here.",12,0xfff3f4ff,false);pad(empty,5,12);pins.addView(empty);return;}
         for(int i=0;i<max;i++){AppEntry a=findApp(favorites.get(i));if(a==null)continue;
@@ -262,7 +296,7 @@ public final class MainActivity extends Activity {
         BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;
         try(InputStream in=getContentResolver().openInputStream(photoUri)){BitmapFactory.decodeStream(in,null,bounds);}
         if(bounds.outWidth<=0||bounds.outHeight<=0)throw new IOException("Invalid photo");
-        int sample=1;while(bounds.outWidth/sample>width*2 || bounds.outHeight/sample>height*2)sample*=2;
+        int sample=1;while(bounds.outWidth/sample>width || bounds.outHeight/sample>height)sample*=2;
         BitmapFactory.Options opts=new BitmapFactory.Options();opts.inSampleSize=sample;
         try(InputStream in=getContentResolver().openInputStream(photoUri)){
             Bitmap photo=BitmapFactory.decodeStream(in,null,opts);if(photo==null)throw new IOException("Unsupported image");
