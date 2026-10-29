@@ -1,4 +1,4 @@
-﻿name: Android debug APK
+name: Android debug APK
 on:
   push:
     branches: [main]
@@ -16,7 +16,10 @@ jobs:
           distribution: temurin
           java-version: '17'
       - name: Install SDK
-        run: sdkmanager --install 'platforms;android-36' 'build-tools;36.0.0'
+        run: |
+          SDK_MANAGER="$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f -print -quit)"
+          if [ -z "$SDK_MANAGER" ]; then echo 'sdkmanager unavailable'; exit 1; fi
+          "$SDK_MANAGER" --install 'platforms;android-36' 'build-tools;36.0.0'
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
