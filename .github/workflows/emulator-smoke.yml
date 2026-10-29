@@ -46,10 +46,7 @@ jobs:
             adb shell cat /sdcard/window.xml | grep -q AETHERSHELL
             adb shell dumpsys meminfo com.aethershell.launcher | head -35
             adb exec-out screencap -p > emulator-screenshot.png
-            if adb logcat -d -s AndroidRuntime:E | grep -q 'FATAL EXCEPTION'; then
-              echo 'AndroidRuntime reported a crash'
-              exit 1
-            fi
+            ! adb logcat -d -s AndroidRuntime:E | grep -q 'FATAL EXCEPTION'
       - name: Attach emulator screenshot
         if: always()
         uses: actions/upload-artifact@v4
