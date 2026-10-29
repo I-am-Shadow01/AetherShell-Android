@@ -55,7 +55,7 @@ public final class MainActivity extends Activity {
     private int accent(){return ACCENTS[Math.floorMod(accent,ACCENTS.length)];}
     private GradientDrawable shape(int color,int rad){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(rad));return d;}
     private GradientDrawable border(int color,int radius,int stroke){GradientDrawable d=shape(color,radius);d.setStroke(dp(1),stroke);return d;}
-    private TextView text(String s,int sp,int color,boolean bold){TextView t=new TextView(this);t.setText(s);t.setTextColor(color);t.setTextSize(sp);t.setFontFeatureSettings("kern");if(bold)t.setTypeface(android.graphics.Typeface.DEFAULT,1);t.setGravity(Gravity.CENTER_VERTICAL);return t;}
+    private TextView text(String s,int sp,int color,boolean bold){TextView t=new TextView(this);t.setText(s);t.setTextColor(color);t.setTextSize(sp);t.setFontFeatureSettings("kern");if(bold)t.setTypeface(android.graphics.Typeface.DEFAULT,Typeface.BOLD);t.setGravity(Gravity.CENTER_VERTICAL);return t;}
     private LinearLayout vertical(){LinearLayout l=new LinearLayout(this);l.setOrientation(1);return l;}
     private LinearLayout horizontal(){LinearLayout l=new LinearLayout(this);l.setOrientation(0);l.setGravity(Gravity.CENTER_VERTICAL);return l;}
     private LinearLayout.LayoutParams lp(int w,int h){return new LinearLayout.LayoutParams(w<0?w:dp(w),h<0?h:dp(h));}
