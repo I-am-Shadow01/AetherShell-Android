@@ -65,7 +65,22 @@ public final class MainActivity extends Activity {
     private TextView pill(String title,Runnable action){TextView t=text(title,13,WHITE,true);t.setGravity(Gravity.CENTER);t.setPadding(dp(14),dp(11),dp(14),dp(11));t.setBackground(shape(CARD,18));t.setOnClickListener(v->action.run());return t;}
     private TextView primary(String title,Runnable action){TextView t=pill(title,action);t.setTextColor(0xff051020);t.setBackground(shape(accent(),18));return t;}
     private void showPage(int dest){page=dest;homeClock=null;homeDate=null;
-        root=new FrameLayout(this);root.setBackgroundColor(BG);setContentView(root);
+        root=new FrameLayout(this);root.setBackgroundColor(BG);
+        // Android 15/16 edge-to-edge: keep navigation, clock, and controls clear of system bars.
+        root.setOnApplyWindowInsetsListener((view,insets)->{
+            int left,top,right,bottom;
+            if(Build.VERSION.SDK_INT>=30){
+                android.graphics.Insets safe=insets.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout());
+                left=safe.left;top=safe.top;right=safe.right;bottom=safe.bottom;
+            }else{
+                left=insets.getSystemWindowInsetLeft();top=insets.getSystemWindowInsetTop();
+                right=insets.getSystemWindowInsetRight();bottom=insets.getSystemWindowInsetBottom();
+            }
+            if(view.getPaddingLeft()!=left||view.getPaddingTop()!=top||view.getPaddingRight()!=right||view.getPaddingBottom()!=bottom)
+                view.setPadding(left,top,right,bottom);
+            return insets;
+        });
+        setContentView(root);
         ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setClipToPadding(false);scroll.setVerticalScrollBarEnabled(false);
         LinearLayout body=vertical();pad(body,18,14);scroll.addView(body);
         FrameLayout.LayoutParams content=new FrameLayout.LayoutParams(-1,-1);content.bottomMargin=dp(74);root.addView(scroll,content);
@@ -298,7 +313,8 @@ public final class MainActivity extends Activity {
         .setItems(new String[]{"Home screen","Lock screen","Home and lock screens"},(dialog,which)->renderAndUse(which,false)).setNegativeButton("Cancel",null).show();}
     private void exportWallpaper(){renderAndUse(0,true);}
     private Bitmap targetBitmap() throws IOException {
-        android.util.DisplayMetrics m=getResources().getDisplayMetrics();int width=Math.min(m.widthPixels,1280),height=(int)((long)width*m.heightPixels/Math.max(1,m.widthPixels));
+        android.util.DisplayMetrics m=new android.util.DisplayMetrics();getWindowManager().getDefaultDisplay().getRealMetrics(m);
+        int width=Math.min(m.widthPixels,1280),height=(int)((long)width*m.heightPixels/Math.max(1,m.widthPixels));
         height=Math.max(1280,Math.min(height,3000));
         if(photoUri==null)return WallpaperArt.bitmap(width,height,wallpaper,amoled);
         BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;
